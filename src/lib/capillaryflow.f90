@@ -20,7 +20,6 @@ module capillaryflow
   
   implicit none
 
-
   !Module parameters
 
   !Module types
@@ -75,7 +74,7 @@ contains
     integer :: MatrixSize,NonZeros,submatrixsize,ngen,i
     real(dp) :: area,Q01_mthrees,sheet_number
     character(len=60) :: sub_name
-
+    
     sub_name = 'cap_flow_ladder'
     call enter_exit(sub_name,1)
 
@@ -104,7 +103,11 @@ contains
       DO i=1,cap_param%num_symm_gen
          sheet_number=sheet_number+2.d0**i
       ENDDO
-      area=cap_param%total_cap_area/(sheet_number*num_units) !m^2
+      ! Obtaining the HU values for the current element
+      ! Determining the sheet scaling factor to use based on the elements HU value
+
+      area=(1.0_dp-elem_field(ne_emph,ne))*cap_param%total_cap_area/(sheet_number*num_units) !m^2
+
 !
 !!  ---CALL THE FUNCTIONS THAT CALCULATE THE FLOW ACROSS THE LADDER FOR A GIVEN PRESSURE DROP--
       call evaluate_ladder(ne,NonZeros,MatrixSize,submatrixsize,ngen,&
@@ -334,6 +337,7 @@ contains
         '(I6,X,5(F9.2,X),2(F8.5,X),F10.2,X,F8.4,X,F10.4,X,F10.3,X,F8.4,X,F9.4,X)') &
          ne,x,y,z,Pin,Pout,Q01_mthrees*1.d9,Qtot*1.d9,Rtot/1000.d0**3.d0,&
          TOTAL_CAP_VOL,TOTAL_SHEET_SA,TT_TOTAL,TOTAL_SHEET_H,Ppl
+         elem_field(nu_vol,ne) = TOTAL_CAP_VOL
         ENDIF
 !
     deallocate (SparseCol, STAT = AllocateStatus)
@@ -872,8 +876,7 @@ subroutine cap_specific_parameters(ne,Ppl,alpha_c,area_scale,length_scale,l_a,ra
 !...   Below value is scaled from dog lung measurements. This is valid in the
 !...   human only. When we consider other animals we may need to add an
 !...   option which defines alpha_c in each species.
-      alpha_c=1.260_dp*((-2.04762e-09_dp*Ptp+1.3019e-07_dp)/98.06_dp) !Units m/cmH2O -> m/Pa
-
+      alpha_c=(1.0_dp-elem_field(ne_emph_c,ne))*1.260_dp*((-2.04762e-09_dp*Ptp+1.3019e-07_dp)/98.06_dp) !Units m/cmH2O -> m/Pa
 
 !    --ARTERIOLE AND VENULE PROPERTIES--
 !###  APPARENT BLOOD VISCOSITY:
@@ -994,7 +997,7 @@ subroutine cap_flow_admit(ne,admit,eff_admit_downstream,Lin,Lout,P1,P2,&
   DO i=1,cap_param%num_symm_gen
       sheet_number=sheet_number+2.d0**i
   ENDDO
-  area=cap_param%total_cap_area/(sheet_number*num_units) !m^2
+  area=(1.0_dp-elem_field(ne_emph,ne))*cap_param%total_cap_area/(sheet_number*num_units) !m^2
   ngen=cap_param%num_symm_gen
   !1. need to resolve the micro-unit flow to get correct pressure and flow in each unit
   allocate (Pressure(submatrixsize), STAT = AllocateStatus)
@@ -1803,5 +1806,7 @@ do i = 1,2*nn+2 !going through columns of k
 call enter_exit(sub_name,2)
 
 end subroutine Mat_to_CC
+
+
 
 end module capillaryflow

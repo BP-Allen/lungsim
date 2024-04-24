@@ -5,5 +5,6 @@
 
 SHO_PUBLIC void import_ventilation(const char *FLOWFILE);
 SHO_PUBLIC void import_perfusion(const char *FLOWFILE);
+SHO_PUBLIC void import_exnodefield(const char *NODEFILE);
 
 #endif /* AETHER_IMPORTS_H */

@@ -7,9 +7,11 @@ void add_mesh_c(const char *AIRWAY_MESHFILE, int *filename_len);
 void add_matching_mesh_c(void);
 void append_units_c(void);
 void define_1d_elements_c(const char *ELEMFILE, int *filename_len);
+void define_1d_exelements_c(const char *ELEMFILE, int *filename_len);
 void define_elem_geometry_2d_c(const char *ELEMFILE, int *filename_len, const char *SF_OPTION, int *sf_option_len);
 void define_mesh_geometry_test_c(void);
 void define_node_geometry_c(const char *NODEFILE, int *filename_len);
+void define_exnode_geometry_c(const char *NODEFILE, int *filename_len);
 void define_node_geometry_2d_c(const char *NODEFILE, int *filename_len);
 void define_data_geometry_c(const char *DATAFILE, int *filename_len);
 void import_node_geometry_2d_c(const char *NODEFILE, int *filename_len);
@@ -50,6 +52,12 @@ void define_1d_elements(const char *ELEMFILE)
   define_1d_elements_c(ELEMFILE, &filename_len);
 }
 
+void define_1d_exelements(const char *ELEMFILE)
+{
+  int filename_len = (int)strlen(ELEMFILE);
+  define_1d_exelements_c(ELEMFILE, &filename_len);
+}
+
 void define_elem_geometry_2d(const char *ELEMFILE, const char *SF_OPTION)
 {
   int filename_len = (int)strlen(ELEMFILE);
@@ -66,6 +74,12 @@ void define_node_geometry(const char *NODEFILE)
 {
   int filename_len = (int)strlen(NODEFILE);
   define_node_geometry_c(NODEFILE, &filename_len);
+}
+
+void define_exnode_geometry(const char *NODEFILE)
+{
+  int filename_len = (int)strlen(NODEFILE);
+  define_exnode_geometry_c(NODEFILE, &filename_len);
 }
 
 void define_node_geometry_2d(const char *NODEFILE)
@@ -162,4 +176,3 @@ void write_node_geometry_2d(const char *NODEFILE)
   int filename_len = (int)strlen(NODEFILE);
   write_node_geometry_2d_c(NODEFILE, &filename_len);
 }
-

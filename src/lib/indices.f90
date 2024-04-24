@@ -22,17 +22,18 @@ module indices
   integer :: num_ord=4,no_gen=1,no_hord=2,no_sord=3,no_type = 4
   ! indices for node_fields
   integer :: num_nj,nj_aw_press=0,nj_bv_press=0,nj_conc1=0,&
-       nj_conc2=0
+       nj_conc2=0,nj_gtv=0,nj_dose=0,nj_emph=0
   ! indices for elem_field
-  integer ::num_ne,ne_radius=0,ne_length=0,ne_vol=0,&
+  integer,target ::num_ne,ne_radius=0,ne_length=0,ne_vol=0,&
        ne_resist=0,ne_t_resist=0,ne_Vdot=0,ne_Vdot0=0,ne_a_A=0,&
        ne_dvdt=0,ne_radius_in=0,ne_radius_in0=0,&
        ne_radius_out=0,ne_radius_out0=0,ne_group=0,ne_Qdot=0, &
-       ne_vd_bel=0, ne_vol_bel=0
+       ne_vd_bel=0, ne_vol_bel=0,ne_emph=0,ne_emph_c=0
   ! indices for unit_field
   integer :: num_nu,nu_vol=0,nu_comp=0,nu_conc2=0,nu_Vdot0=0,nu_Vdot1=0, &
        nu_Vdot2=0,nu_dpdt=0,nu_pe=0,nu_vt=0,nu_air_press=0,nu_conc1=0,nu_vent=0,&
-       nu_vd=0,nu_perf=0,nu_blood_press=0
+       nu_vd=0,nu_perf=0,nu_blood_press=0,&
+       nu_sheet_area=0
   !indices for gas exchange field
   ! indices for gasex_field
   integer,parameter :: num_gx = 12
@@ -54,18 +55,19 @@ module indices
   
   public num_ord,no_gen,no_hord,no_sord,no_type
   
-  public num_nj,nj_aw_press,nj_bv_press,nj_conc1,nj_conc2
+  public num_nj,nj_aw_press,nj_bv_press,nj_conc1,nj_conc2,nj_gtv,nj_dose,nj_emph
   
   public num_ne,ne_radius,ne_length,ne_vol,&
        ne_resist,ne_t_resist,ne_Vdot,ne_Vdot0,ne_a_A,&
        ne_dvdt,ne_radius_in,ne_radius_in0,ne_radius_out,&
        ne_radius_out0,ne_group,ne_Qdot, &
-       ne_vd_bel, ne_vol_bel
+       ne_vd_bel, ne_vol_bel,ne_emph,ne_emph_c
   
   public num_nu,nu_vol,nu_comp, nu_conc2,nu_Vdot0,nu_Vdot1, &
        nu_Vdot2,nu_dpdt,nu_pe,nu_vt,nu_air_press,&
        nu_conc1,nu_vent,nu_vd,&
-       nu_perf,nu_blood_press
+       nu_perf,nu_blood_press,&
+       nu_sheet_area
   
   public num_gx, ng_p_alv_o2,ng_p_alv_co2,ng_p_ven_o2,ng_p_ven_co2, &
        ng_p_cap_o2, ng_p_cap_co2,ng_source_o2,ng_source_co2, &
@@ -285,10 +287,13 @@ contains
     call enter_exit(sub_name,1)
     
     ! indices for node_field
-    num_nj=1
+    num_nj=4
     nj_bv_press=1 !pressure in blood vessel
+    nj_gtv=2 !gtv location
+    nj_dose=3 !radiation dose value
+    nj_emph=4 !HU used for emphysema
     ! indices for elem_field
-    num_ne=9
+    num_ne=11
     ne_radius=1 !strained average radius over whole element
     ne_radius_in=2 !strained radius into an element
     ne_radius_out=3 !strained radius out of an element
@@ -298,10 +303,14 @@ contains
     ne_Qdot=7 !flow in an element
     ne_resist=8 !resistance of a blood vessel
     ne_group=9!Groups vessels into arteries (field=0), capillaries (field=1) and veins(field=2)
+    ne_emph=10 ! emphysema scaling area
+    ne_emph_c=11 ! emphysema compliance scaling
     !indices for units
-    num_nu=2
-    nu_perf=1
+    num_nu=4
+    nu_perf=1 !! CHECK Capillary flow for indices 1-3
     nu_blood_press=2
+    nu_sheet_area=3
+    nu_vol=4 ! capillary blood volume solved value
     
     call enter_exit(sub_name,2)
   end subroutine perfusion_indices

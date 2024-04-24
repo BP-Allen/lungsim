@@ -30,9 +30,11 @@ module geometry
   public append_units
   public coord_at_xi
   public define_1d_elements
+  public define_1d_exelements
   public define_elem_geometry_2d
   public define_mesh_geometry_test
   public define_node_geometry
+  public define_exnode_geometry
   public define_node_geometry_2d
   public define_data_geometry
   public define_rad_from_file
@@ -41,6 +43,7 @@ module geometry
   public element_connectivity_2d
   public evaluate_ordering
   public get_final_real
+  public get_final_exreal
   public get_local_node_f
   public group_elem_parent_term
   public import_node_geometry_2d
@@ -53,6 +56,8 @@ module geometry
   public volume_of_mesh
   public write_geo_file
   public get_final_integer
+  public get_final_exinteger
+  public get_local_node
   public get_four_nodes
   public write_elem_geometry_2d
   public write_node_geometry_2d
@@ -828,7 +833,7 @@ contains
     !.....at the end of the line
     read_number_of_nodes : do !define a do loop name
        read(unit=10, fmt="(a)", iostat=ierror) ctemp1 !read a line into ctemp1
-       if(index(ctemp1, "nodes")> 0) then !keyword "nodes" is found in ctemp1
+       if(index(ctemp1, "number of nodes")> 0) then !keyword "nodes" is found in ctemp1
           num_nodes_temp = get_final_integer(ctemp1) !return the final integer
           exit read_number_of_nodes !exit the named do loop
        endif
@@ -4706,7 +4711,273 @@ contains
     call enter_exit(sub_name,2)
     
   end subroutine write_3d_geo
+!!!#############################################################################
+!!!##################### MY FUNCTIONS ##########################################
+!!!#############################################################################
 
+  subroutine define_1d_exelements(ELEMFILE)
+    !*define_1d_elements:* Reads in an 1D element exelem file to define a geometry
+    
+    character(len=MAX_FILENAME_LEN), intent(in) :: ELEMFILE
+    !     Local Variables
+    integer :: ibeg,iend,ierror,i_ss_end,j,ne,ne_global,&
+         nn,np,np1,np2,np_global
+    character(LEN=132) :: ctemp1
+    character(len=300) :: readfile
+    character(LEN=40) :: sub_string
+    character(len=60) :: sub_name
+    
+    ! --------------------------------------------------------------------------
+    
+    sub_name = 'define_1d_exelements'
+    call enter_exit(sub_name,1)
+    
+    if(index(ELEMFILE, "exelem")> 0) then !full filename is given
+       readfile = ELEMFILE
+    else ! need to append the correct filename extension
+       readfile = trim(ELEMFILE)//'.exelem'
+    endif
+    num_elems = 0
+    open(10, file=readfile, status='old')
+    
+    read_number_of_elements : do
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+       if(index(ctemp1, "Element")> 0) then
+          num_elems = num_elems + 1
+       elseif (ierror.eq.5001.or.ierror.eq.-1) then
+          exit read_number_of_elements 
+       endif
+    end do read_number_of_elements
+    close(10)
+    
+!!! allocate memory for element arrays
+    if(allocated(elems)) deallocate(elems)
+    allocate(elems(num_elems))
+    if(allocated(elem_cnct)) deallocate(elem_cnct)
+    allocate(elem_cnct(-1:1,0:2,0:num_elems))
+    if(allocated(elem_nodes)) deallocate(elem_nodes)
+    allocate(elem_nodes(2,num_elems))
+    if(allocated(elem_ordrs)) deallocate(elem_ordrs)
+    allocate(elem_ordrs(num_ord,num_elems))
+    if(allocated(elem_symmetry)) deallocate(elem_symmetry)
+    allocate(elem_symmetry(num_elems))
+    if(allocated(elem_units_below)) deallocate(elem_units_below)
+    allocate(elem_units_below(num_elems))
+    if(allocated(elems_at_node)) deallocate(elems_at_node)
+    allocate(elems_at_node(num_nodes,0:3))
+    if(allocated(elem_field)) deallocate(elem_field)
+    allocate(elem_field(num_ne,num_elems))
+    if(allocated(elem_direction)) deallocate(elem_direction)
+    allocate(elem_direction(3,num_elems))
+    if(model_type.eq.'gas_mix')then
+       if(allocated(expansile)) deallocate(expansile)
+       allocate(expansile(num_elems))
+    endif
+    
+    open(10, file=readfile, status='old')
+    
+!!! initialise element arrays
+    elems = 0
+    elem_nodes = 0
+    elem_ordrs = 0  ! where the default is that 0==respiratory and 1==conducting
+    elem_symmetry = 1
+    elem_field = 0.0_dp
+    if(model_type.eq.'gas_mix')expansile = .false.
+    
+    ne=0
+    
+    read_an_element : do
+       !.......read element number
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+       if(index(ctemp1, "Element")> 0) then
+          ne_global = get_final_exinteger(ctemp1) !return the final integer
+          ne=ne+1
+          elems(ne)=ne_global
+          read_element_nodes : do
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             if(index(ctemp1, "Nodes")> 0) then !found the correct line
+                read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+                sub_string = adjustl(ctemp1)
+                i_ss_end=len(sub_string) !get the end location of the sub-string
+                ibeg=1
+                do nn=1,2
+                   iend=index(sub_string," ") !get location of first blank in sub-string
+                   read (sub_string(ibeg:iend-1), '(i7)' ) np_global
+                   call get_local_node(np_global,np) ! get local node np for global node
+                   elem_nodes(nn,ne)=np ! the local node number, not global
+                   sub_string = adjustl(sub_string(iend:i_ss_end)) ! get chars beyond blank, remove leading blanks
+                end do
+                exit read_element_nodes
+             endif !index
+          end do read_element_nodes
+          if(ne.ge.num_elems) exit read_an_element
+       endif
+       
+    end do read_an_element
+    
+    close(10)
+    
+    ! calculate the element lengths and directions
+    do ne=1,num_elems
+       np1=elem_nodes(1,ne)
+       np2=elem_nodes(2,ne)
+       elem_field(ne_length,ne) = sqrt((node_xyz(1,np2) - &
+            node_xyz(1,np1))**2 + (node_xyz(2,np2) - &
+            node_xyz(2,np1))**2 + (node_xyz(3,np2) - &
+            node_xyz(3,np1))**2)
+       do j=1,3
+          elem_direction(j,ne) = (node_xyz(j,np2) - &
+               node_xyz(j,np1))/elem_field(ne_length,ne)
+       enddo !j
+    enddo
+    
+    call element_connectivity_1d
+    call evaluate_ordering
+
+    elem_ordrs(no_type,:) = 1 ! 0 for respiratory, 1 for conducting
+    
+    call enter_exit(sub_name,2)
+
+  end subroutine define_1d_exelements
+
+!!!#############################################################################
+
+  
+  subroutine define_exnode_geometry(NODEFILE)
+    !*define_node_geometry:* Reads in an exnode file to define a tree geometry
+    
+    character(len=MAX_FILENAME_LEN), intent(in) :: NODEFILE !Input nodefile
+    !     Local Variables
+    integer :: i,ierror,np,np_global,num_nodes_temp=0
+    real(dp) :: point
+    logical :: overwrite = .false. ! initialised
+    character(len=300) :: ctemp1,readfile
+    character(len=60) :: sub_name
+    
+    ! --------------------------------------------------------------------------
+    
+    sub_name = 'define_exnode_geometry'
+    call enter_exit(sub_name,1)
+    
+    if(index(NODEFILE, ".exnode")> 0) then !full filename is given
+       readfile = NODEFILE
+    else ! need to append the correct filename extension
+       readfile = trim(NODEFILE)//'.exnode'
+    endif
+    
+    open(10, file=readfile, status='old')
+    
+    if(num_nodes.gt.0) overwrite = .true.
+    !.....read in the total number of nodes. read each line until one is found
+    !.....that has the correct keyword (nodes). then return the integer that is
+    !.....at the end of the line
+    read_number_of_nodes : do !define a do loop name
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1 !read a line into ctemp1
+       if(index(ctemp1, "Node")> 0) then !keyword "nodes" is found in ctemp1
+          num_nodes_temp = num_nodes_temp + 1
+       elseif (ierror.eq.5001.or.ierror.eq.-1) then
+          exit read_number_of_nodes
+       endif
+    end do read_number_of_nodes
+    
+    close(10)
+    
+    if(.not.overwrite) call allocate_node_arrays(num_nodes_temp) ! don't allocate if just overwriting
+    open(10, file=readfile, status='old')    
+    !.....read the coordinate, derivative, and version information for each node. 
+    np=0
+    read_a_node : do !define a do loop name
+       !.......read node number
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+       if(index(ctemp1, "Node")> 0) then
+          np_global = get_final_integer(ctemp1) !get node number          
+          np = np+1
+          nodes(np) = np_global
+          !.......read coordinates
+          do i=1,3 ! for the x,y,z coordinates
+             read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+             point = get_final_exreal(ctemp1)
+             node_xyz(i,np)=point
+          end do !i
+       endif !index
+       if(np.ge.num_nodes_temp) exit read_a_node
+    end do read_a_node
+    
+    if(.not.overwrite) num_nodes = num_nodes_temp
+    
+    close(10)
+    
+    call enter_exit(sub_name,2)
+    
+  end subroutine define_exnode_geometry
+
+!!!#############################################################################
+
+  function get_final_exreal(string)
+    !*get_final_real:* gets the last real number on a string
+
+    character,intent(in) :: string*(*)
+    ! Local parameters
+    integer :: ibeg,iend
+    real(dp) :: rsign,rtemp,get_final_exreal
+    character :: sub_string*(40)
+    
+    ! --------------------------------------------------------------------------
+    
+    sub_string = adjustl(string) ! get the characters beyond :
+    iend=len(sub_string) !get the length of the sub-string
+    if(sub_string(1:1).eq.'-')then !check whether negative
+       rsign=-1.0_dp
+       ibeg=2
+    else
+       rsign=1.0_dp
+       ibeg=1
+    endif
+   
+    read (sub_string(ibeg:iend), * ) rtemp !get real value
+    rtemp=rtemp*rsign !apply sign to number
+    
+    get_final_exreal=rtemp !return the real value
+    
+  end function get_final_exreal
+
+!!!#############################################################################
+
+  function get_final_exinteger(string)
+    !*get_final_integer*
+    
+    character,intent(in) :: string*(*)
+    ! Local parameters
+    integer :: ibeg,iend,ierror,nsign,ntemp
+    character :: sub_string*(40)
+    integer :: get_final_exinteger
+    
+    ! --------------------------------------------------------------------------
+    
+    iend=len(string) !get the length of the string
+    ibeg=index(string,":")+1 !get location of integer in string, follows ":"
+    sub_string = adjustl(string(ibeg:iend)) ! get the characters beyond ":"
+    iend=index(sub_string," ") !length of the sub-string
+    if(sub_string(1:1).eq.'-')then !check for negative sign
+       nsign=-1
+       ibeg=2
+    else
+       nsign=1
+       ibeg=1
+    endif
+    
+    read (sub_string(ibeg:iend), '(i10)', iostat=ierror ) ntemp !get integer values
+    if(ierror.gt.0)then
+       !... something wrong with data
+       write(*,'(''Data read error'')')
+       write(*,'(a)') sub_string(ibeg:iend)
+    endif
+    ntemp=ntemp*nsign !apply sign to number
+    
+    get_final_exinteger=ntemp !return the integer value
+    
+  end function get_final_exinteger
+  
 !!!#############################################################################
   
 end module geometry

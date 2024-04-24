@@ -1,0 +1,3 @@
+
+[:platform_system == "Windows"]
+intel-fortran-rt

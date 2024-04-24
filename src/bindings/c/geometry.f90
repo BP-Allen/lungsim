@@ -78,6 +78,27 @@ contains
 !
 !###################################################################################
 !
+  subroutine define_1d_exelements_c(ELEMFILE, filename_len) bind(C, name="define_1d_exelements_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN
+    use geometry, only: define_1d_exelements
+    implicit none
+
+    integer,intent(in) :: filename_len
+    type(c_ptr), value, intent(in) :: ELEMFILE
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, ELEMFILE, filename_len)
+
+    call define_1d_exelements(filename_f)
+
+  end subroutine define_1d_exelements_c
+
+!
+!###################################################################################
+!
   subroutine define_elem_geometry_2d_c(ELEMFILE, filename_len, SF_OPTION, sf_option_len) bind(C, name="define_elem_geometry_2d_c")
     use iso_c_binding, only: c_ptr
     use utils_c, only: strncpy
@@ -126,6 +147,27 @@ contains
     call define_node_geometry(filename_f)
 
   end subroutine define_node_geometry_c
+
+!
+!###################################################################################
+!
+  subroutine define_exnode_geometry_c(NODEFILE, filename_len) bind(C, name="define_exnode_geometry_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN
+    use geometry, only: define_exnode_geometry
+    implicit none
+
+    integer,intent(in) :: filename_len
+    type(c_ptr), value, intent(in) :: NODEFILE
+    character(len=MAX_FILENAME_LEN) :: filename_f
+
+    call strncpy(filename_f, NODEFILE, filename_len)
+
+    call define_exnode_geometry(filename_f)
+
+  end subroutine define_exnode_geometry_c
 
 !
 !###################################################################################
@@ -412,9 +454,6 @@ contains
     call write_node_geometry_2d(filename_f)
 
   end subroutine write_node_geometry_2d_c
-!
-!###################################################################################
-!
 
 end module geometry_c
 

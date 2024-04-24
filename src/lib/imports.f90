@@ -27,6 +27,7 @@ module imports
   private 
   public import_ventilation
   public import_perfusion
+  public import_exnodefield
 
 contains
 !
@@ -133,7 +134,90 @@ contains
 
    close(10)
 
-    call enter_exit(sub_name,2)
+   call enter_exit(sub_name,2)
+   
  end subroutine import_exelemfield
+ 
+!
+!##############################################################################
+!
+!>*import_exnodefield:* This subroutine reads in the content of an exnode field file (N fields)
+!! BE CAREFUL: This subroutine must either have the nodefile account for the entire network (arteries,veins,capillaries) or be done before the matching stage
+ subroutine import_exnodefield(NODEFILE) 
+
+   character(len=MAX_FILENAME_LEN),intent(in) :: NODEFILE
+   !local variables
+   integer :: ierror,np_global,ne,num_fields,counter,temp_index,np
+   character(LEN=132) :: ctemp1
+   character(LEN=10) :: temp_str
+   character(len=60) :: sub_name
+   ! temporary local variables
+   type(character(len=10)), allocatable, dimension(:) :: field_categories
+   real(dp),allocatable :: temp_values(:)
+   real(dp) :: np1,np2
+   
+   sub_name = 'import_exnodefield'
+   call enter_exit(sub_name,1)
+
+   open(10, file=NODEFILE, status='old')
+   read(unit=10, fmt="(a)", iostat=ierror) ctemp1   
+   temp_index = 1
+   read_node_file : do !define a do loop name
+     !.......read node file
+     read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+     if (ierror.eq.5001.or.ierror.eq.-1) exit read_node_file
+     ! allocating the temporary arrays based on number of fields in the node file
+     if(index(ctemp1, "Fields=")> 0) then
+       read(ctemp1(10:11), *) num_fields
+       num_fields = num_fields - 1
+       if(allocated(temp_values)) deallocate(temp_values)
+       if(allocated(field_categories)) deallocate(field_categories)
+       allocate(temp_values(num_fields + 3))
+       allocate(field_categories(num_fields))
+       temp_index = 1
+     elseif(index(ctemp1, "field")> 0) then
+     ! storing the field categories (may be erroneously ordered)
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+       field_categories(temp_index) = ctemp1(1:index(ctemp1, "."))
+       temp_index = temp_index + 1       
+     ! storing the values for node fields 
+     elseif(index(ctemp1, "Node:")> 0) then
+       np_global = get_final_integer(ctemp1)
+       call get_local_node(np_global,np) ! get local node np for global node
+       read(unit=10, fmt="(a)", iostat=ierror) ctemp1
+       read(ctemp1,*) temp_values 
+       read_fields: do counter=1,num_fields
+         temp_str = field_categories(counter)
+         if(index(temp_str,'tumour')>0) then
+           temp_index = nj_gtv
+         elseif(index(temp_str,'dose')>0) then
+           temp_index = nj_dose
+         elseif(index(temp_str,'emph')>0) then
+           temp_index = nj_emph
+         endif 
+         call set_node_field_value(temp_index,np,temp_values(counter + 3))
+       enddo read_fields
+     endif
+     if(np.ge.num_nodes) exit read_node_file
+   enddo read_node_file
+
+   close(10)
+   deallocate(temp_values)
+   deallocate(field_categories)
+   
+   do ne=1,num_elems
+      np1 = node_field(nj_emph,elem_nodes(1,ne))
+      np2 = node_field(nj_emph,elem_nodes(2,ne))
+      if (np1.le.-950_dp .or.np2.le.-950_dp)then
+         !elem_field(ne_emph,ne) = 0.9_dp -- BPOA masters versions
+         !elem_field(ne_emph_c,ne) = 0.92_dp 
+         elem_field(ne_emph,ne) = -0.001_dp*(np1 + np2)/2.0_dp - 0.05_dp ! Averaging may not be the best course of action here
+         elem_field(ne_emph_c,ne) = -0.0012_dp*(np1 + np2)/2.0_dp - 0.22_dp         
+      endif
+   enddo
+   
+   call enter_exit(sub_name,2)
+ end subroutine import_exnodefield
+
 
 end module imports

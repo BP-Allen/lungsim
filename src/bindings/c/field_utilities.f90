@@ -26,5 +26,28 @@ contains
 
   end subroutine scale_flow_to_inlet_c
 
+!
+!###################################################################################
+!
+
+  subroutine calculate_blood_volume_c(OUTPUT, out_len) bind(C, name="calculate_blood_volume_c")
+
+    use iso_c_binding, only: c_ptr
+    use utils_c, only: strncpy
+    use other_consts, only: MAX_FILENAME_LEN, MAX_STRING_LEN
+    use field_utilities, only: calculate_blood_volume
+    implicit none
+
+    integer,intent(in) :: out_len
+    type(c_ptr), value, intent(in) :: OUTPUT
+    character(len=MAX_STRING_LEN) :: out_f
+
+    call strncpy(out_f, OUTPUT, out_len)
+    
+    call calculate_blood_volume(out_f)
+
+  end subroutine calculate_blood_volume_c 
+
+
 end module field_utilities_c
 
