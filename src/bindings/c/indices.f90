@@ -21,7 +21,18 @@ contains
     call define_problem_type(filename_f)
 
   end subroutine define_problem_type_c
+!
+!######################################################################
+!
+!> Lymphatic indices
+  subroutine lymphatic_indices_c() bind(C, name="lymphatic_indices_c")
 
+    use indices, only: lymphatic_indices
+    implicit none
+
+    call lymphatic_indices()
+    
+  end subroutine lymphatic_indices_c
 
   !> Ventilation indices
   subroutine ventilation_indices_c() bind(C, name="ventilation_indices_c")

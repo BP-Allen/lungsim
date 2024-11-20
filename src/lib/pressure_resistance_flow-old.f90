@@ -1058,19 +1058,8 @@ subroutine calc_press_area(grav_vect,KOUNT,depvar_at_node,prq_solution,&
            if(counter2.ge.101.0_dp) counter2=1.0_dp 
          elseif((R0.ge.0.05_dp).and.(R0.le.1.5_dp))then !! Remodelling only a fraction of the arteries
            if(counter1/100.le.remodel_fraction) then 
-             if((R0.ge.0.05_dp).and.(R0.lt.0.125_dp))then
-               nfactor = 0.7_dp
-               lum_hyp = 0.179_dp
-             elseif((R0.ge.0.125_dp).and.(R0.lt.0.5_dp))then
-               nfactor = 2.0_dp/3.0_dp + R0/3.75_dp
-               !lum_hyp = 0.203_dp + R0/6.7_dp
-               lum_hyp = 0.1095_dp/0.75_dp + R0*0.264_dp  
-               ! https://pmc.ncbi.nlm.nih.gov/articles/PMC10625450/
-               ! ERS and ESC guideliens on PAH are the main contributors for peripheral vasculature deteriorating before proximal arteries.
-             elseif((R0.ge.0.5_dp).and.(R0.lt.1.5_dp))then
-               nfactor = 0.8_dp
-               lum_hyp = 0.278_dp
-             endif
+             nfactor = 2.0_dp/3.0_dp + R0/3.75_dp
+             lum_hyp = 0.203_dp + R0/6.7_dp
            endif
            counter1 = counter1 + 1.0_dp 
            if(counter1.ge.101.0_dp) counter1=1.0_dp 

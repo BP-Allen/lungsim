@@ -94,49 +94,47 @@ contains
 
     call enter_exit(sub_name,1)
     
-    do ne=1,num_elems
-      L = elem_field(ne_length,ne)
-      !! Calculating the area and determining vessel type from current element
-      R = elem_field(ne_radius,ne)  
-      if (elem_field(ne_group,ne).eq.0) then
-         area = PI*R**2.0_dp
-         vol = area*L
-         vessel_type = 1
-      elseif (elem_field(ne_group,ne).eq.2) then
-         area = PI*R**2.0_dp
-         vol = area*L
-         vessel_type = 2
-      else
-         vessel_type = 0
-      endif
-      if (out_format.eq.'disc') then
-         !! Categorising volume based on the area of the vessel
-         if (vessel_type.ne.0) then
-            bin_find: do bn=1,18 
-               if (area.lt.bins(bn)) then !! store volumes/areas for EACH element
-                  bin_storage(bn,vessel_type) = bin_storage(bn,vessel_type) + vol
-                  exit bin_find
-               elseif (area.gt.bins(18)) then
-                  bin_storage(19,vessel_type) = bin_storage(19,vessel_type) + vol
-                  exit bin_find               
-               endif
-            enddo bin_find
-         else
-            cbv = cbv + elem_field(nu_vol,ne)
-         endif
-      endif
-    enddo
-    if (out_format.eq. 'disc') then
-       101 format(1x, *(g0, ","))        
-       open(10, file='TBV_disc.out', status='replace') 
-       write(10, 101) string
-       write(10, *) "Arterial Volumes"
-       write(10, 101) bin_storage(:,1)
-       write(10, *) "Venous Volumes"       
-       write(10, 101) bin_storage(:,2)
-       write(10, *) "Capillary Volume"
-       write(10, *) cbv
-       close(10)
+    if (out_format.eq.'disc') then
+      do ne=1,num_elems
+        L = elem_field(ne_length,ne)
+        !! Calculating the area and determining vessel type from current element
+        R = elem_field(ne_radius,ne)  
+        if (elem_field(ne_group,ne).eq.0) then
+           area = PI*R**2.0_dp
+           vol = area*L
+           vessel_type = 1
+        elseif (elem_field(ne_group,ne).eq.2) then
+           area = PI*R**2.0_dp
+           vol = area*L
+           vessel_type = 2
+        else
+           vessel_type = 0
+        endif
+        !! Categorising volume based on the area of the vessel
+        if (vessel_type.ne.0) then
+          bin_find: do bn=1,18 
+             if (area.lt.bins(bn)) then !! store volumes/areas for EACH element
+                bin_storage(bn,vessel_type) = bin_storage(bn,vessel_type) + vol
+                exit bin_find
+             elseif (area.gt.bins(18)) then
+                bin_storage(19,vessel_type) = bin_storage(19,vessel_type) + vol
+                exit bin_find               
+             endif
+          enddo bin_find
+        else
+          cbv = cbv + elem_field(nu_vol,ne)
+        endif
+      enddo 
+      101 format(1x, *(g0, ","))        
+      open(10, file='TBV_disc.out', status='replace') 
+      write(10, 101) string
+      write(10, *) "Arterial Volumes"
+      write(10, 101) bin_storage(:,1)
+      write(10, *) "Venous Volumes"       
+      write(10, 101) bin_storage(:,2)
+      write(10, *) "Capillary Volume"
+      write(10, *) cbv
+      close(10)
     elseif (out_format.eq.'cont') then  
        open(10, file='TBV_cont.exelem', status='replace')
        write(10,'( '' Group name: Blood_volumes'' )')

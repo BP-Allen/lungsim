@@ -94,6 +94,8 @@ contains
     sum_tidal = 0.0_dp ! initialise the inspired and expired volumes
     sum_expid = 0.0_dp
     last_vol = 0.0_dp
+    unit_field(nu_Pe_max,:) = -1.0e6_dp
+    unit_field(nu_Pe_min,:) = 1.0e6_dp
 
 !!! set default values for the parameters that control the breathing simulation
 !!! these should be controlled by user input (showing hard-coded for now)
@@ -480,9 +482,9 @@ contains
        ne = units(nunit)
        np2 = elem_nodes(2,ne)
        ppl_current = ppl_current - unit_field(nu_pe,nunit) + &
-            node_field(nj_aw_press,np2)
+            node_field(nj_aw_press,np2) ! pleural pressure for unit summed into the overall lungs
     enddo !noelem
-    ppl_current = ppl_current/num_units
+    ppl_current = ppl_current/num_units ! averaged over the number of units - assumes uniformity here
 
     call enter_exit(sub_name,2)
 
@@ -547,18 +549,23 @@ contains
        !calculate a compliance for the tissue unit
        ratio = unit_field(nu_vol,nunit)/undef
        lambda = ratio**(1.0_dp/3.0_dp) !uniform extension ratio
-       exp_term = exp(0.75_dp*(3.0_dp*a+b)*(lambda**2-1.0_dp)**2)
+       exp_term = exp(0.75_dp*(3.0_dp*a+b)*(lambda**2-1.0_dp)**2) ! exponential term for equation A.8 from Swan et al paper
 
        unit_field(nu_comp,nunit) = cc*exp_term/6.0_dp*(3.0_dp*(3.0_dp*a+b)**2 &
             *(lambda**2-1.0_dp)**2/lambda**2+(3.0_dp*a+b) &
             *(lambda**2+1.0_dp)/lambda**4)
-       unit_field(nu_comp,nunit) = undef/unit_field(nu_comp,nunit) ! V/P
+       unit_field(nu_comp,nunit) = undef/unit_field(nu_comp,nunit) ! V/P = A.16 from Swan et al paper
        ! add the chest wall (proportionately) in parallel
        unit_field(nu_comp,nunit) = 1.0_dp/(1.0_dp/unit_field(nu_comp,nunit)&
             +1.0_dp/(chest_wall_compliance/dble(num_units)))
        !estimate an elastic recoil pressure for the unit
        unit_field(nu_pe,nunit) = cc/2.0_dp*(3.0_dp*a+b)*(lambda**2.0_dp &
-            -1.0_dp)*exp_term/lambda
+            -1.0_dp)*exp_term/lambda ! almost 1 half of equation A.15 from Swan et al paper?? Shouldnt it be lambda**2 in the denominator??
+       ! set minimum and maximum Pe values
+       unit_field(nu_Pe_max,nunit) = max(unit_field(nu_Pe_max,nunit), &
+            unit_field(nu_pe,nunit))
+       unit_field(nu_Pe_min,nunit) = min(unit_field(nu_Pe_min,nunit), &
+            unit_field(nu_pe,nunit))
     enddo !nunit
 
     call enter_exit(sub_name,2)
@@ -654,7 +661,7 @@ contains
             node_xyz(3,np1))**2)
 
        ! element radius
-       elem_field(ne_radius,ne) = sqrt(alpha) * elem_field(ne_radius,ne)
+       elem_field(ne_radius,ne) = sqrt(alpha) * elem_field(ne_radius,ne) ! only new thing in this subroutine - could be used to scale entire airway tree???
 
        ! element volume
        elem_field(ne_vol,ne) = PI * elem_field(ne_radius,ne)**2 * &
@@ -705,9 +712,9 @@ contains
        if(elem_field(ne_Vdot,ne).lt.0.0_dp) gamma = 0.46_dp !expiration
        
        reynolds = abs(elem_field(ne_Vdot,ne)*2.0_dp*GAS_DENSITY/ &
-            (pi*elem_field(ne_radius,ne)*GAS_VISCOSITY))
+            (pi*elem_field(ne_radius,ne)*GAS_VISCOSITY)) ! reynolds number calculation
        zeta = MAX(1.0_dp,dsqrt(2.0_dp*elem_field(ne_radius,ne)* &
-            reynolds/elem_field(ne_length,ne))*gamma)
+            reynolds/elem_field(ne_length,ne))*gamma) ! equation 4 from Swan et al paper
        elem_field(ne_resist,ne) = resistance * zeta
        elem_field(ne_t_resist,ne) = elem_field(ne_resist,ne) + &
             elem_field(ne_t_resist,ne)
